@@ -3,6 +3,7 @@ module github.com/webdevops/azure-metrics-exporter
 go 1.15
 
 require (
+	github.com/Azure/azure-kusto-go v0.2.1
 	github.com/Azure/azure-sdk-for-go v45.1.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.3
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.1

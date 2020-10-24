@@ -37,6 +37,9 @@ const (
 
 	ProbeLoganalyticsScrapeUrl            = "/probe/loganalytics/query"
 	ProbeLoganalyticsScrapeTimeoutDefault = 120
+
+	ProbeKustoScrapeUrl            = "/probe/kusto/query"
+	ProbeKustoScrapeTimeoutDefault = 5
 )
 
 var (
@@ -51,6 +54,7 @@ var (
 
 	azureInsightMetrics      *AzureInsightMetrics
 	azureLogAnalyticsMetrics *AzureLogAnalysticsMetrics
+	azureKustoMetrics        *AzureKustoMetrics
 
 	metricsCache *cache.Cache
 
@@ -140,6 +144,7 @@ func initAzureConnection() {
 
 	azureInsightMetrics = NewAzureInsightMetrics()
 	azureLogAnalyticsMetrics = NewAzureLogAnalysticsMetrics()
+	azureKustoMetrics = NewAzureKustoMetrics()
 }
 
 // start and handle prometheus handler
@@ -160,6 +165,10 @@ func startHttpServer() {
 
 	http.HandleFunc(ProbeLoganalyticsScrapeUrl, func(w http.ResponseWriter, r *http.Request) {
 		probeLogAnalyticsQueryHandler(w, r)
+	})
+
+	http.HandleFunc(ProbeKustoScrapeUrl, func(w http.ResponseWriter, r *http.Request) {
+		probeKustoQueryHandler(w, r)
 	})
 
 	log.Fatal(http.ListenAndServe(opts.ServerBind, nil))
