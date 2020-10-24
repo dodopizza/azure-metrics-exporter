@@ -15,7 +15,7 @@ import (
 func probeKustoQueryHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var timeoutSeconds float64
-	var endpoint, database, query string
+	var endpoint, database, query, mappingValueColumn string
 	params := r.URL.Query()
 
 	startTime := time.Now()
@@ -52,6 +52,8 @@ func probeKustoQueryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	mappingValueColumn = paramsGetWithDefault(params, "mappingValueColumn", "")
+
 	result, err := azureKustoMetrics.Query(ctx, endpoint, database, kusto.NewStmt("", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(query))
 
 	if err != nil {
@@ -71,6 +73,41 @@ func probeKustoQueryHandler(w http.ResponseWriter, r *http.Request) {
 
 	metricsList := prometheusCommon.NewMetricsList()
 	metricsList.SetCache(metricsCache)
+
+	if result.Result != nil {
+		var metricLabels []string
+
+		if len(*result.Result) > 1 && result.Result != nil {
+			for _, columnName := range (*result.Result)[0].ColumnNames {
+				if columnName != mappingValueColumn {
+					metricLabels = append(metricLabels, columnName)
+				}
+			}
+		}
+
+		kustoRowGauge := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "azurerm_kusto_query_row",
+			Help: "Azure Kusto Data Explorer query row",
+		}, metricLabels)
+		registry.MustRegister(kustoRowGauge)
+
+		for _, row := range *result.Result {
+			rowLabels := prometheus.Labels{}
+
+			for i := range row.ColumnNames {
+				columnName := row.ColumnNames[i]
+				valueStr := row.Values[i]
+
+				if mappingValueColumn != columnName {
+					rowLabels[columnName] = valueStr
+				}
+			}
+
+			metricsList.AddInfo(rowLabels)
+		}
+
+		metricsList.GaugeSet(kustoRowGauge)
+	}
 
 	// global stats counter
 	prometheusCollectTime.With(prometheus.Labels{
