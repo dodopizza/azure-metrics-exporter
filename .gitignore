@@ -1,4 +1,8 @@
 /vendor/
 /azure-metrics-exporter
+<<<<<<< HEAD
 
 .idea/
+=======
+launch.json
+>>>>>>> master
