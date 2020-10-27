@@ -3,13 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strconv"
+	"time"
+
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/unsafe"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
-	"net/http"
-	"time"
 )
 
 func probeKustoQueryHandler(w http.ResponseWriter, r *http.Request) {
@@ -52,7 +54,7 @@ func probeKustoQueryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mappingValueColumn = paramsGetWithDefault(params, "mappingValueColumn", "")
+	mappingValueColumn = paramsGetWithDefault(params, "valueColumn", "")
 
 	result, err := azureKustoMetrics.Query(ctx, endpoint, database, kusto.NewStmt("", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(query))
 
@@ -90,6 +92,7 @@ func probeKustoQueryHandler(w http.ResponseWriter, r *http.Request) {
 			Help: "Azure Kusto Data Explorer query row",
 		}, metricLabels)
 		registry.MustRegister(kustoRowGauge)
+		var metricsValue float64
 
 		for _, row := range *result.Result {
 			rowLabels := prometheus.Labels{}
@@ -100,10 +103,18 @@ func probeKustoQueryHandler(w http.ResponseWriter, r *http.Request) {
 
 				if mappingValueColumn != columnName {
 					rowLabels[columnName] = valueStr
+				} else {
+					if s, err := strconv.ParseFloat(valueStr, 64); err == nil {
+						metricsValue = s
+					} else {
+						contextLogger.Error(err)
+						http.Error(w, err.Error(), http.StatusBadRequest)
+					}
+
 				}
 			}
 
-			metricsList.AddInfo(rowLabels)
+			metricsList.Add(rowLabels, metricsValue)
 		}
 
 		metricsList.GaugeSet(kustoRowGauge)
